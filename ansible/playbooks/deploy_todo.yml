@@ -1,0 +1,69 @@
+---
+- name: Deploy Todo App to all servers
+  hosts: app_servers
+  become: yes
+  vars:
+    app_dir: /opt/todo-app
+    db_host: localhost
+    db_port: 5432
+    db_user: postgres
+    db_password: postgres
+    db_name: todos_db
+    backend_port: 8090
+    frontend_port: 3010
+
+  tasks:
+    - name: Create app directory
+      file:
+        path: "{{ app_dir }}"
+        state: directory
+        mode: '0755'
+
+    - name: Copy docker-compose file
+      copy:
+        src: ../docker-compose.prod.yml
+        dest: "{{ app_dir }}/docker-compose.yml"
+        mode: '0644'
+
+    - name: Create .env file
+      template:
+        src: ../templates/backend-env.j2
+        dest: "{{ app_dir }}/backend.env"
+        mode: '0600'
+
+    - name: Copy Dockerfile for backend
+      copy:
+        src: ../backend/Dockerfile
+        dest: "{{ app_dir }}/Dockerfile.backend"
+        mode: '0644'
+
+    - name: Copy Dockerfile for frontend
+      copy:
+        src: ../frontend/Dockerfile
+        dest: "{{ app_dir }}/Dockerfile.frontend"
+        mode: '0644'
+
+    - name: Pull Docker images from registry
+      shell: |
+        docker pull ghcr.io/egarc-global/todo-backend:latest || echo "Backend image not found in registry"
+        docker pull ghcr.io/egarc-global/todo-frontend:latest || echo "Frontend image not found in registry"
+      ignore_errors: yes
+
+    - name: Start containers with docker-compose
+      shell: |
+        cd {{ app_dir }}
+        docker-compose up -d
+      register: docker_output
+
+    - name: Wait for backend health check
+      uri:
+        url: "http://localhost:{{ backend_port }}/health"
+        status_code: 200
+      register: backend_health
+      until: backend_health.status == 200
+      retries: 10
+      delay: 5
+
+    - name: Display deployment status
+      debug:
+        msg: "Todo app deployed successfully on {{ inventory_hostname }}"

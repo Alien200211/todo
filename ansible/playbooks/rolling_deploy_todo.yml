@@ -1,0 +1,75 @@
+---
+- name: Rolling Deploy Todo App (Zero Downtime)
+  hosts: app_servers
+  serial: 1
+  become: yes
+  vars:
+    app_dir: /opt/todo-app
+
+  pre_tasks:
+    - name: Verify backend health on other servers
+      uri:
+        url: "http://{{ item }}:8090/health"
+        status_code: 200
+      loop: "{{ groups['app_servers'] | difference([inventory_hostname]) }}"
+      register: health_check
+      ignore_errors: yes
+      when: inventory_hostname != groups['app_servers'][0]
+
+  tasks:
+    - name: Pull latest images from registry
+      shell: |
+        docker pull ghcr.io/egarc-global/todo-backend:latest
+        docker pull ghcr.io/egarc-global/todo-frontend:latest
+      register: pull_output
+
+    - name: Stop and restart containers with latest images
+      shell: |
+        cd {{ app_dir }}
+        docker-compose down
+        docker-compose up -d
+      register: docker_restart
+
+    - name: Wait for backend health check
+      uri:
+        url: "http://localhost:8090/health"
+        status_code: 200
+      register: backend_health
+      until: backend_health.status == 200
+      retries: 30
+      delay: 2
+
+    - name: Wait for frontend health check
+      uri:
+        url: "http://localhost:3010"
+        status_code: 200
+      register: frontend_health
+      until: frontend_health.status == 200
+      retries: 30
+      delay: 2
+
+    - name: Display deployment status
+      debug:
+        msg: "✓ Server {{ inventory_hostname }} deployment complete"
+
+  post_tasks:
+    - name: Wait 30 seconds for stability
+      wait_for:
+        timeout: 30
+      when: inventory_hostname != groups['app_servers'][-1]
+
+    - name: Final health check across all servers
+      uri:
+        url: "http://{{ item }}:8090/health"
+        status_code: 200
+      loop: "{{ groups['app_servers'] }}"
+      register: final_health_check
+      when: inventory_hostname == groups['app_servers'][-1]
+
+    - name: Summary
+      debug:
+        msg: |
+          ✓ Rolling deployment complete!
+          All servers running latest Todo App
+          Access at: https://todo.egarcglobal.com
+      when: inventory_hostname == groups['app_servers'][-1]
