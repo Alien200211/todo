@@ -3,6 +3,7 @@
   hosts: app_servers
   serial: 1
   become: yes
+  gather_facts: no
   vars:
     app_dir: /opt/todo-app
 
@@ -19,15 +20,15 @@
   tasks:
     - name: Pull latest images from registry
       shell: |
-        docker pull ghcr.io/egarc-global/todo-backend:latest
-        docker pull ghcr.io/egarc-global/todo-frontend:latest
+        docker pull ghcr.io/alien200211/todo-backend:latest
+        docker pull ghcr.io/alien200211/todo-frontend:latest
       register: pull_output
 
     - name: Stop and restart containers with latest images
       shell: |
         cd {{ app_dir }}
-        docker-compose down
-        docker-compose up -d
+        docker compose down
+        docker compose up -d
       register: docker_restart
 
     - name: Wait for backend health check

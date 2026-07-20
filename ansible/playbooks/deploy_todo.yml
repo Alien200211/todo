@@ -2,6 +2,7 @@
 - name: Deploy Todo App to all servers
   hosts: app_servers
   become: yes
+  gather_facts: no
   vars:
     app_dir: /opt/todo-app
     db_host: localhost
@@ -21,7 +22,7 @@
 
     - name: Copy docker-compose file
       copy:
-        src: ../docker-compose.prod.yml
+        src: ../../docker-compose.prod.yml
         dest: "{{ app_dir }}/docker-compose.yml"
         mode: '0644'
 
@@ -33,26 +34,26 @@
 
     - name: Copy Dockerfile for backend
       copy:
-        src: ../backend/Dockerfile
+        src: ../../backend/Dockerfile
         dest: "{{ app_dir }}/Dockerfile.backend"
         mode: '0644'
 
     - name: Copy Dockerfile for frontend
       copy:
-        src: ../frontend/Dockerfile
+        src: ../../frontend/Dockerfile
         dest: "{{ app_dir }}/Dockerfile.frontend"
         mode: '0644'
 
     - name: Pull Docker images from registry
       shell: |
-        docker pull ghcr.io/egarc-global/todo-backend:latest || echo "Backend image not found in registry"
-        docker pull ghcr.io/egarc-global/todo-frontend:latest || echo "Frontend image not found in registry"
+        docker pull ghcr.io/alien200211/todo-backend:latest || echo "Backend image not found in registry"
+        docker pull ghcr.io/alien200211/todo-frontend:latest || echo "Frontend image not found in registry"
       ignore_errors: yes
 
-    - name: Start containers with docker-compose
+    - name: Start containers with docker compose
       shell: |
         cd {{ app_dir }}
-        docker-compose up -d
+        docker compose up -d
       register: docker_output
 
     - name: Wait for backend health check
