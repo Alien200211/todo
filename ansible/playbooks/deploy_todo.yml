@@ -5,13 +5,13 @@
   gather_facts: no
   vars:
     app_dir: /opt/todo-app
-    db_host: localhost
+    db_host: postgres
     db_port: 5432
     db_user: postgres
     db_password: postgres
     db_name: todos_db
-    backend_port: 8090
-    frontend_port: 3010
+    backend_port: 8091
+    frontend_port: 3011
 
   tasks:
     - name: Create app directory
